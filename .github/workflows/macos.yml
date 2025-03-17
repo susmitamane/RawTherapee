@@ -116,13 +116,32 @@ jobs:
 
       - name: Test-launch the app
         run: |
-          cd build
-          sudo cp -R RawTherapee.app /Applications
-          open -a /Applications/RawTherapee.app
-          sleep 5
-          echo "Applications running: $(osascript -e 'tell application "Finder" to get the name of every process whose visible is true')" >> $GITHUB_STEP_SUMMARY
-          osascript -e 'if application "RawTherapee" is not running then do shell script "exit 1"'
-          osascript -e 'tell application "RawTherapee" to if it is running then quit'
+         cd build
+         sudo cp -R RawTherapee.app /Applications
+    
+         # Remove quarantine attributes in case macOS blocks it
+         sudo xattr -r -d com.apple.quarantine /Applications/RawTherapee.app
+    
+         # Check if the app exists
+         if [ ! -d "/Applications/RawTherapee.app" ]; then
+         echo "RawTherapee.app is missing from /Applications"
+         exit 1
+         fi
+    
+         # Launch the application
+         open -a /Applications/RawTherapee.app
+         sleep 10
+    
+         # List running processes for debugging
+          echo "Running Applications: $(osascript -e 'tell application "Finder" to get the name of every process whose visible is true')" >> $GITHUB_STEP_SUMMARY
+    
+         if ! osascript -e 'if application "RawTherapee" is not running then error "RawTherapee failed to launch" number 1'; then
+          echo "RawTherapee did not start correctly."
+          exit 1
+         fi
+
+         # Quit the application
+         osascript -e 'tell application "RawTherapee" to quit'
 
       - name: Test the -cli
         run: |
