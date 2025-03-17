@@ -116,32 +116,49 @@ jobs:
 
       - name: Test-launch the app
         run: |
-         cd build
-         sudo cp -R RawTherapee.app /Applications
-    
-         # Remove quarantine attributes in case macOS blocks it
-         sudo xattr -r -d com.apple.quarantine /Applications/RawTherapee.app
-    
-         # Check if the app exists
-         if [ ! -d "/Applications/RawTherapee.app" ]; then
-         echo "RawTherapee.app is missing from /Applications"
-         exit 1
-         fi
-    
-         # Launch the application
-         open -a /Applications/RawTherapee.app
-         sleep 10
-    
-         # List running processes for debugging
-          echo "Running Applications: $(osascript -e 'tell application "Finder" to get the name of every process whose visible is true')" >> $GITHUB_STEP_SUMMARY
-    
-         if ! osascript -e 'if application "RawTherapee" is not running then error "RawTherapee failed to launch" number 1'; then
-          echo "RawTherapee did not start correctly."
-          exit 1
-         fi
+          cd build
+          sudo cp -R RawTherapee.app /Applications
 
-         # Quit the application
-         osascript -e 'tell application "RawTherapee" to quit'
+          # ✅ Remove security quarantine
+          sudo xattr -r -d com.apple.quarantine /Applications/RawTherapee.app
+
+          # ✅ Fix permissions (ensure it can run)
+          sudo chmod -R 755 /Applications/RawTherapee.app
+          sudo chown -R $(whoami) /Applications/RawTherapee.app
+
+          # ✅ Confirm the app exists
+          if [ ! -d "/Applications/RawTherapee.app" ]; then
+          echo "RawTherapee.app is missing from /Applications"
+          exit 1
+          fi
+
+          # ✅ Check system architecture
+          echo "System Architecture: $(uname -m)"
+
+          # ✅ Try launching directly from the terminal to capture logs
+          echo "Launching RawTherapee..."
+          /Applications/RawTherapee.app/Contents/MacOS/RawTherapee &> ~/rt_log.txt &
+          sleep 10
+
+          # ✅ Check logs
+          echo "======== RawTherapee Log Output ========"
+          cat ~/rt_log.txt || echo "No logs found."
+
+          # ✅ Check if the app is running
+          if ! pgrep -f RawTherapee > /dev/null; then
+          echo "⚠️ RawTherapee did not start correctly."
+          echo "======== Checking Dependencies ========"
+          otool -L /Applications/RawTherapee.app/Contents/MacOS/RawTherapee || echo "otool command failed"
+
+          echo "======== Checking Running Processes ========"
+          ps aux | grep -i "[R]awTherapee" || echo "No RawTherapee process found."
+
+          exit 1
+          fi
+
+          # ✅ Quit the application
+          osascript -e 'tell application "RawTherapee" to quit'
+
 
       - name: Test the -cli
         run: |
